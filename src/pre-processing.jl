@@ -1,10 +1,10 @@
 module PreProcessing
 
-using ResumableFunctions
+# using ResumableFunctions
 
 export prepare_files,
-       get_table
-
+       Publication,
+       Author
 
 
 mutable struct Publication
@@ -14,34 +14,48 @@ end
 
 
 mutable struct Author
-    cnpq           :: String
-    publications   :: Array{Publication}
-    unique_authors :: Array
-    groups         :: Dict
-    n_max_coauth   :: Int64
-    co_oc_matrix
+    cnpq           :: Union{String, Nothing}
+    publications   :: Union{Array,  Nothing}
+    unique_authors :: Union{Array,  Nothing}
+    groups         :: Union{Dict,   Nothing}
+    n_max_coauth   :: Union{Int64,  Nothing}
+    co_oc_matrix   :: Union{Array,  Nothing}
+    adj_list       :: Union{Dict,   Nothing}
+    qtd_of_publ    :: Union{Int64,  Nothing}
+    function Author(cnpq=nothing, p=nothing, u_a=nothing, gr=nothing, n_max_coauth=nothing,co_oc_matrix=nothing, adj=nothing, qtd=nothing)
+        new(cnpq, p, u_a, gr, n_max_coauth, co_oc_matrix, adj, qtd)
+    end
+
 end
 
 
-norm(x) = strip(x) |> string |> lowercase
-Base.zero(t::Type{AbstractArray}) = []
-Base.zero(t::Type{Any}) = []
 
-function get_table(path_to_file)
+norm(x) = strip(x) |> string |> lowercase
+Base.zero(t::Type{AbstractArray}) = [] #
+Base.zero(t::Type{Any}) = []           # Sadly, this don't work
+
+function get_table_and_adj(path_to_file)
     authors_set = Dict{String,Integer}()
+    adj_list = Dict{Integer,Set{Integer}}()
     author_indx = 1
-    for line in readlines(path_to_file)
+    for (i,line) in enumerate(readlines(path_to_file))
         yr, authors = split(line, " @ ")
-        for author in split(authors, ";")
+        authors = split(authors, ";")
+        last_indxs = []
+        for author in authors
+            indx = author_indx
             if !haskey(authors_set, author)
                 push!(authors_set, author=>author_indx)
+                indx = author_indx
                 author_indx+=1
             end
+            push!(last_indxs, indx)
         end
+        push!(adj_list, i=>Set(last_indxs))
     end
 
     # co_oc_matrix = zeros(Any, author_indx, author_indx)
-    co_oc_matrix = [Any[] for _=1:author_indx, _=1:author_indx]
+    co_oc_matrix = [Int64[] for _=1:author_indx, _=1:author_indx]
 
     for (publ_indx, line) in enumerate(readlines(path_to_file))
         _, authors = split(line, " @ ") |> (x)->(parse(Int64,x[1]),split(x[2],";"))
@@ -50,14 +64,14 @@ function get_table(path_to_file)
             for author2 in authors[i:end]
                 indx_a1 = authors_set[author1]
                 indx_a2 = authors_set[author2]
-                push!(co_oc_matrix[indx_a1, indx_a2], publ_indx)# =  vcat(co_oc_matrix[indx_a1, indx_a2], [publ_indx])
+                push!(co_oc_matrix[indx_a1, indx_a2], publ_indx)  # =  vcat(co_oc_matrix[indx_a1, indx_a2], [publ_indx])
 
                 # println("$indx_a1:$author1  \t\t\t  $indx_a2:$author2  \t\t\t  in:$publ_indx   ls:$(co_oc_matrix[indx_a1, indx_a2])")
             end
         end
     end
 
-    return co_oc_matrix
+    return (co_oc_matrix, adj_list)
 end
 
 
@@ -114,22 +128,24 @@ function transform_csv(folder, file)
         push!(publications, Publication(yr, new_authors))
     end
 
-    author = Author(file, publications, collect(unique_authors), Dict(), max_authors, get_table(folder*file)[1])
+    author = Author(file, publications, collect(unique_authors), Dict(), max_authors)
     author.groups = groups_by_n(author)
-    # author.co_oc_matrix = get_table(folder*file)[1]
+    author.co_oc_matrix, author.adj_list = get_table_and_adj(folder*file)
+    author.qtd_of_publ = length(publications)
 
     return author
 end
 
 
 
-# """
-#     prepare_files(folder::String)
-#
-# Get's `folder` with all input files from lattes, and convert
-# then to a more efficient format.
-# """
-# @resumable function prepare_files(folder::String)
+"""
+    prepare_files(folder::String)
+
+Get's `folder` with all input files from lattes, and convert
+then to a more efficient format.
+
+Returns: A list of Author
+"""
 function prepare_files(folder::String)
     contents = []
     for file in readdir(folder)
@@ -143,19 +159,6 @@ end  # module PreProcessing
 
 
 
-using .PreProcessing, JSON
+# using .PreProcessing, JSON
 # contents = prepare_files("../test/publications/")
-# content = get_table("../test/publications/4723095218834013")
-
-content = get_table("../test/publications/4723484073177616")
-println(content,"\n")
-# println(json(collect(contents)[3],4))
-# for line in eachrow(content)
-#     for item in line
-#         if length(item) == 0
-#             item = [0]
-#         end
-#         print("$(join(item,","))\t\t\t")
-#     end
-#     println()
-# end
+# println(json(contents[3].adj_list, 2))

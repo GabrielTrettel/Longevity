@@ -1,11 +1,3 @@
-module PreProcessing
-
-# using ResumableFunctions
-
-export prepare_files,
-       Publication,
-       Author
-
 
 mutable struct Publication
     year    :: Int64
@@ -147,7 +139,7 @@ then to a more efficient format.
 Returns: A list of Author
 """
 function prepare_files(folder::String)
-    contents = []
+    contents = Author[]
     for file in readdir(folder)
         push!(contents, transform_csv(folder, file))
         # @yield transform_csv(folder, file)
@@ -155,10 +147,7 @@ function prepare_files(folder::String)
     return contents
 end
 
-end  # module PreProcessing
 
-
-
-# using .PreProcessing, JSON
+# using JSON
 # contents = prepare_files("../test/publications/")
 # println(json(contents[3].adj_list, 2))

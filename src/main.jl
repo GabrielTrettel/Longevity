@@ -1,14 +1,13 @@
-module Walker
+module Longevity
 
 export main
 
 include("pre-processing.jl")
 include("walker.jl")
 
-using .PreProcessing, .Walker
 
 function main()
-    in_folder, out_folder = ("","")
+    in_folder, out_folder = ("", "")
     try
         in_folder  = ARGS[1] * if ARGS[1][end] == '/' "" else "/" end
         out_folder = ARGS[1] * if ARGS[1][end] == '/' "" else "/" end
@@ -22,14 +21,16 @@ function main()
         out_folder *= if out_folder[end] == '/' "" else "/" end
     end
 
-    return 0
-
     input_data = prepare_files(in_folder)
-    process_and_dump(input_data, out_folder)
+    @show typeof(input_data)
+
+    # process_and_dump(input_data[2], out_folder)
+    @time map(x->process_and_dump(x, out_folder), input_data)
+
 end
 
 
-end  # module Walker
+end  # module Longevity
 
-using .Walker
+using .Longevity
 main()
